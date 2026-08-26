@@ -1,0 +1,23 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function esCoach() {
+      return exists(/databases/$(database)/documents/usuarios/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/usuarios/$(request.auth.uid)).data.role == "coach";
+    }
+
+    // Cada quien puede leer/crear su propio perfil. Un coach puede leer todos.
+    match /usuarios/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || esCoach());
+      allow create: if request.auth != null && request.auth.uid == uid;
+      allow update, delete: if false;
+    }
+
+    // Cada cliente lee y escribe SOLO sus propios datos. El coach puede leer todos.
+    match /datos/{uid} {
+      allow read: if request.auth != null && (request.auth.uid == uid || esCoach());
+      allow write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
