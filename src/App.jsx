@@ -187,6 +187,7 @@ function Panel({ uid, nombre, onLogout }) {
   const [data, setData] = useState({ ingresos: [], gastos: [] });
   const [loaded, setLoaded] = useState(false);
   const [modo, setModo] = useState(null);
+  const [verTodos, setVerTodos] = useState(false);
 
   useEffect(() => { (async () => { setData(await obtenerDatos(uid)); setLoaded(true); })(); }, [uid]);
 
@@ -226,10 +227,11 @@ function Panel({ uid, nombre, onLogout }) {
   function deleteIngreso(id) { update((prev) => ({ ...prev, ingresos: prev.ingresos.filter((i) => i.id !== id) })); }
   function deleteGasto(id) { update((prev) => ({ ...prev, gastos: prev.gastos.filter((g) => g.id !== id) })); }
 
-  const movimientos = useMemo(() => {
+  const todosMovimientos = useMemo(() => {
     const todos = [...data.ingresos.map((i) => ({ ...i, esIngreso: true })), ...data.gastos.map((g) => ({ ...g, esIngreso: false }))];
-    return todos.sort((a,b) => new Date(b.fecha) - new Date(a.fecha)).slice(0, 5);
+    return todos.sort((a,b) => new Date(b.fecha) - new Date(a.fecha));
   }, [data]);
+  const movimientos = verTodos ? todosMovimientos : todosMovimientos.slice(0, 5);
 
   if (!loaded) return <div style={loadingStyle}>Cargando…</div>;
 
@@ -282,6 +284,11 @@ function Panel({ uid, nombre, onLogout }) {
                 <button onClick={() => m.esIngreso ? deleteIngreso(m.id) : deleteGasto(m.id)} style={{ ...iconBtnStyle, marginLeft: 2 }}>×</button>
               </div>
             ))}
+            {todosMovimientos.length > 5 && (
+              <button onClick={() => setVerTodos(!verTodos)} style={verTodosBtnStyle}>
+                {verTodos ? <>Ver menos <ChevronUp size={14} /></> : <>Ver todos ({todosMovimientos.length}) <ChevronDown size={14} /></>}
+              </button>
+            )}
           </div>
         )}
         <div style={{ textAlign: "center", fontSize: 10.5, color: "#5f5a7d", marginTop: 16 }}>Todo se guarda solo. Un registro a la vez, un paso más cerca 💫</div>
@@ -469,5 +476,6 @@ const cancelBtnStyle = { flex:1, padding:"12px 0", borderRadius:12, border:"1px 
 const confirmBtnStyle = { flex:1.4, padding:"12px 0", borderRadius:12, border:"none", color:"#05040c", fontWeight:800, fontSize:13, cursor:"pointer" };
 const movRowStyle = { display:"flex", alignItems:"center", gap:10, padding:"8px 0", borderBottom:"1px solid #1c1738" };
 const iconBtnStyle = { background:"none", border:"none", cursor:"pointer", color:"#6f6a8f", fontSize:18, lineHeight:1, padding:"0 4px" };
+const verTodosBtnStyle = { width:"100%", display:"flex", alignItems:"center", justifyContent:"center", gap:6, marginTop:10, padding:"8px 0", background:"transparent", border:"none", color:"#8783a1", fontSize:11.5, fontWeight:700, cursor:"pointer" };
 const emptyStyle = { fontSize:12, color:"#6f6a8f", padding:"6px 0" };
 const alertBox = { fontSize:11.5, color:"#fca5a5", background:"rgba(239,68,68,0.08)", border:"1px solid rgba(239,68,68,0.35)", borderRadius:10, padding:"8px 10px" };
