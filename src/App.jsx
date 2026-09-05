@@ -366,6 +366,7 @@ function CoachDashboard({ nombre, onLogout }) {
   const [cargando, setCargando] = useState(true);
   const [busqueda, setBusqueda] = useState("");
   const [abierto, setAbierto] = useState(null);
+  const [expandidos, setExpandidos] = useState({}); // { [nombreCliente]: true/false }
   const start = useMemo(() => startOfWeek(new Date()), []);
   const end = useMemo(() => endOfWeek(new Date()), []);
 
@@ -375,7 +376,7 @@ function CoachDashboard({ nombre, onLogout }) {
       const ingresoSemana = c.ingresos.filter((i) => enSemana(i.fecha, start, end)).reduce((a,b)=>a+b.monto,0);
       const gastoSemana = c.gastos.filter((g) => enSemana(g.fecha, start, end)).reduce((a,b)=>a+b.monto,0);
       const movimientos = [...c.ingresos.map(i=>({...i, esIngreso:true})), ...c.gastos.map(g=>({...g, esIngreso:false}))]
-        .sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).slice(0,6);
+        .sort((a,b)=>new Date(b.fecha)-new Date(a.fecha));
       return { nombre: c.nombre, ingresoSemana, gastoSemana, disponible: ingresoSemana-gastoSemana, movimientos };
     });
     lista.sort((a,b) => a.nombre.localeCompare(b.nombre));
@@ -385,6 +386,10 @@ function CoachDashboard({ nombre, onLogout }) {
 
   useEffect(() => { cargarClientes(); }, [cargarClientes]);
   const filtrados = clientes.filter((c) => c.nombre.toLowerCase().includes(busqueda.trim().toLowerCase()));
+
+  function toggleExpandido(nombreCliente) {
+    setExpandidos((prev) => ({ ...prev, [nombreCliente]: !prev[nombreCliente] }));
+  }
 
   return (
     <div style={pageStyle}>
@@ -412,38 +417,47 @@ function CoachDashboard({ nombre, onLogout }) {
         {cargando && <div style={emptyStyle}>Cargando clientes…</div>}
         {!cargando && filtrados.length===0 && <div style={emptyStyle}>Aún no tienes clientes registrados.</div>}
 
-        {filtrados.map((c) => (
-          <div key={c.nombre} style={clientCardStyle}>
-            <button onClick={() => setAbierto(abierto===c.nombre?null:c.nombre)} style={clientHeaderBtnStyle}>
-              <div style={{ textAlign:"left" }}>
-                <div style={{ fontSize:13.5, fontWeight:700, color:"#f4f2fb" }}>{c.nombre}</div>
-                <div style={{ fontSize:11, color:"#8783a1" }}>Le quedan <b style={{ color: c.disponible>=0?"#4ade80":"#f87171" }}>{money(c.disponible)}</b> esta semana</div>
+        {filtrados.map((c) => {
+          const verTodosEsteCliente = !!expandidos[c.nombre];
+          const movimientosMostrados = verTodosEsteCliente ? c.movimientos : c.movimientos.slice(0, 6);
+          return (
+            <div key={c.nombre} style={clientCardStyle}>
+              <button onClick={() => setAbierto(abierto===c.nombre?null:c.nombre)} style={clientHeaderBtnStyle}>
+                <div style={{ textAlign:"left" }}>
+                  <div style={{ fontSize:13.5, fontWeight:700, color:"#f4f2fb" }}>{c.nombre}</div>
+                  <div style={{ fontSize:11, color:"#8783a1" }}>Le quedan <b style={{ color: c.disponible>=0?"#4ade80":"#f87171" }}>{money(c.disponible)}</b> esta semana</div>
+                </div>
+                {abierto===c.nombre ? <ChevronUp size={16} color="#8783a1" /> : <ChevronDown size={16} color="#8783a1" />}
+              </button>
+              <div style={{ display:"flex", gap:16, padding:"0 16px 12px", fontSize:11 }}>
+                <span style={{ color:"#8783a1" }}>Ganó <b style={{ color:"#22d3ee" }}>{money(c.ingresoSemana)}</b></span>
+                <span style={{ color:"#8783a1" }}>Gastó <b style={{ color:"#ec4899" }}>{money(c.gastoSemana)}</b></span>
               </div>
-              {abierto===c.nombre ? <ChevronUp size={16} color="#8783a1" /> : <ChevronDown size={16} color="#8783a1" />}
-            </button>
-            <div style={{ display:"flex", gap:16, padding:"0 16px 12px", fontSize:11 }}>
-              <span style={{ color:"#8783a1" }}>Ganó <b style={{ color:"#22d3ee" }}>{money(c.ingresoSemana)}</b></span>
-              <span style={{ color:"#8783a1" }}>Gastó <b style={{ color:"#ec4899" }}>{money(c.gastoSemana)}</b></span>
-            </div>
-            {abierto===c.nombre && (
-              <div style={{ padding:"0 16px 16px" }}>
-                {c.movimientos.length===0 && <div style={emptyStyle}>Sin movimientos aún.</div>}
-                {c.movimientos.map((m) => (
-                  <div key={m.id} style={movRowStyle}>
-                    <span style={{ fontSize:16 }}>{m.esIngreso ? TIPOS_INGRESO.find(t=>t.id===m.tipo)?.emoji||"💰" : CATEGORIAS_GASTO.find(cat=>cat.id===m.categoria)?.emoji||"📦"}</span>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      <div style={{ fontSize:12, color:"#e5e2f2", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
-                        {m.esIngreso ? TIPOS_INGRESO.find(t=>t.id===m.tipo)?.label||"Ingreso" : (m.nota || CATEGORIAS_GASTO.find(cat=>cat.id===m.categoria)?.label||"Gasto")}
+              {abierto===c.nombre && (
+                <div style={{ padding:"0 16px 16px" }}>
+                  {c.movimientos.length===0 && <div style={emptyStyle}>Sin movimientos aún.</div>}
+                  {movimientosMostrados.map((m) => (
+                    <div key={m.id} style={movRowStyle}>
+                      <span style={{ fontSize:16 }}>{m.esIngreso ? TIPOS_INGRESO.find(t=>t.id===m.tipo)?.emoji||"💰" : CATEGORIAS_GASTO.find(cat=>cat.id===m.categoria)?.emoji||"📦"}</span>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ fontSize:12, color:"#e5e2f2", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>
+                          {m.esIngreso ? TIPOS_INGRESO.find(t=>t.id===m.tipo)?.label||"Ingreso" : (m.nota || CATEGORIAS_GASTO.find(cat=>cat.id===m.categoria)?.label||"Gasto")}
+                        </div>
+                        <div style={{ fontSize:9.5, color:"#6f6a8f", display:"flex", alignItems:"center", gap:3 }}><Clock size={9} />{fmtDiaCorto(m.fecha)} · {fmtHora(m.fecha)}</div>
                       </div>
-                      <div style={{ fontSize:9.5, color:"#6f6a8f", display:"flex", alignItems:"center", gap:3 }}><Clock size={9} />{fmtDiaCorto(m.fecha)} · {fmtHora(m.fecha)}</div>
+                      <div style={{ fontSize:12, fontWeight:700, fontFamily:"ui-monospace, monospace", color: m.esIngreso?"#22d3ee":"#ec4899" }}>{m.esIngreso?"+":"−"}{money(m.monto)}</div>
                     </div>
-                    <div style={{ fontSize:12, fontWeight:700, fontFamily:"ui-monospace, monospace", color: m.esIngreso?"#22d3ee":"#ec4899" }}>{m.esIngreso?"+":"−"}{money(m.monto)}</div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        ))}
+                  ))}
+                  {c.movimientos.length > 6 && (
+                    <button onClick={() => toggleExpandido(c.nombre)} style={verTodosBtnStyle}>
+                      {verTodosEsteCliente ? <>Ver menos <ChevronUp size={14} /></> : <>Ver todos ({c.movimientos.length}) <ChevronDown size={14} /></>}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
         <div style={{ textAlign:"center", fontSize:10, color:"#5f5a7d", marginTop:18, lineHeight:1.6 }}>Toca "Actualizar" para ver lo último que anotaron tus clientes.</div>
       </div>
     </div>
